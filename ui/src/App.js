@@ -1,5 +1,6 @@
 import Header from "./components/Header";
 import Card from "./components/Card";
+import GetStartedCard from "./components/GetStartedCard";
 import Controls from "./components/Controls";
 import styled from "styled-components";
 
@@ -17,7 +18,7 @@ function App() {
       <Wrapper>
         <Card imageSrc="/tmp1.png" />
         <Controls />
-        <Card imageSrc="/tmp2.png" />
+        <GetStartedCard />
       </Wrapper>
     </div>
   );
