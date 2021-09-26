@@ -3,13 +3,13 @@ pragma solidity ^0.8.6;
 
 import "ds-test/test.sol";
 
-import "./Wizardsgame.sol";
+import "./WizardArena.sol";
 
-contract WizardsgameTest is DSTest {
-    Wizardsgame wizardsgame;
+contract WizardArenaTest is DSTest {
+    WizardArena wizardArena;
 
     function setUp() public {
-        wizardsgame = new Wizardsgame();
+        wizardArena = new WizardArena();
     }
 
     function testFail_basic_sanity() public {

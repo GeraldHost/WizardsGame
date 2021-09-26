@@ -1,4 +1,4 @@
-import styled from "styled-components";
+import styled, { css } from "styled-components";
 
 export default styled.button`
   apperance: none;  
@@ -16,4 +16,10 @@ export default styled.button`
     top: 1px;
     left: -1px;
   }
+
+  ${(props) =>
+    props.active &&
+    css`
+      background-color: #bdbdbd !important;
+    `}
 `;

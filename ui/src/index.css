@@ -35,7 +35,8 @@ body {
   z-index: -1;
 }
 
-h1 {
+h1,
+h3 {
   font-family: alagard, sans-serif;
   margin: 0;
 }
