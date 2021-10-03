@@ -46,7 +46,7 @@ contract Wizards {
     uint256 tokenId,
     address owner,
     string memory tokenURI
-  ) public virtual {
+  ) virtual public {
     require(
       msg.sender == AddressAliasHelper.applyL1ToL2Alias(l1Target),
       "only updateable by L1"

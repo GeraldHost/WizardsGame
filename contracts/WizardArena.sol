@@ -16,10 +16,8 @@ contract WizardArena {
     bytes32 commitment;
   }
   
-  type Inputs uint256[3][3];
-
   struct InputsOption {
-    Inputs value;
+    uint256[3][3] value;
     bool isSet;
   }
 
@@ -41,7 +39,7 @@ contract WizardArena {
 
   event Commit(address sender, uint256 tokenId);
 
-  event Reveal(address sender, uint256 tokenId, Inputs inputs);
+  event Reveal(address sender, uint256 tokenId, uint256[3][3] inputs);
 
   constructor(uint64 _gracePeriod, Wizards _wizards) {
     gracePeriod = _gracePeriod;
@@ -81,7 +79,7 @@ contract WizardArena {
     emit Commit(msg.sender, tokenId);
   }
 
-  function reveal(uint256 tokenId, Inputs memory inputs) public tokenExists(tokenId) {
+  function reveal(uint256 tokenId, uint256[3][3] memory inputs) public tokenExists(tokenId) {
     require(status(tokenId) == Status.REVEAL, "reveal: status not ready");
     bytes32 battleHash = tokenIdToBattle[tokenId];
     require(commitments[battleHash][tokenId] == keccak256(abi.encodePacked(inputs)), "reveal: commitment hash does not match");
@@ -147,8 +145,8 @@ contract WizardArena {
   }
 
   function _score(bytes32 battleHash, uint256 tokenId) internal view returns (uint256) {
-    Inputs memory revelation = revelations[battleHash][tokenId];
-    Inputs memory opponentRevelation = revelations[battleHash][opponent(tokenId)];
+    InputsOption memory revelation = revelations[battleHash][tokenId];
+    InputsOption memory opponentRevelation = revelations[battleHash][opponent(tokenId)];
   
     if(!_hasRevelations(battleHash)) {
       // players haven't both revealed yet so just early return
@@ -160,7 +158,7 @@ contract WizardArena {
     
     uint256 score = 0;
 
-    for(uint256 i = 0; i < 3) {
+    for(uint256 i = 0; i < 3; i++) {
       if(selection[i] == 0 && opponentSelection[i] == 2
         || selection[i] == 1 && opponentSelection[i] == 0
         || selection[i] == 2 && opponentSelection[i] == 1) {
@@ -190,8 +188,9 @@ contract WizardArena {
   // Convert inputs into selections i.e
   // inputs: uint[3][3] [[11, 22, 0], [33, 44, 0], [55, 55, 0]]
   // selection: uint[3] [2, 2, 2]
-  function _inputsToSelection(Inputs memory inputs) internal pure returns (uint256[3]) {
-    uint256[3] selection = new uint256(3);
+  function _inputsToSelection(uint256[3][3] memory inputs) internal pure returns (uint256[3] memory) {
+    uint256[3] memory selection;
+
     for(uint i = 0; i < 3; i++) {
       if(inputs[i][0] == 0) {
         selection[i] = 0;
@@ -201,6 +200,8 @@ contract WizardArena {
         selection[i] = 2;
       }
     }
+
+    return selection;
   }
 
   function _resetQueued() internal {
