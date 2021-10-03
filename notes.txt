@@ -1,0 +1,6 @@
+- create "rick" branch to replace master
+- convert to use hardhat
+- delete snarking shit
+- replace commit with uint[3][3]
+- create mock Wizard "claim"
+- write tests

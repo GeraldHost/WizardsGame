@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
 import "./Wizards.sol";
-import "./interfaces/ICommitVerifier.sol";
 
 contract WizardArena {
 
@@ -16,14 +15,19 @@ contract WizardArena {
     uint256 tokenId;
     bytes32 commitment;
   }
+  
+  type Inputs uint256[3][3];
+
+  struct InputsOption {
+    Inputs value;
+    bool isSet;
+  }
 
   uint256 public gracePeriod;
 
   Wizards public wizards;
 
   Queued public queued;
-
-  ICommitVerifier public commitVerifier;
   
   mapping(bytes32 => Battle) public battles;
 
@@ -31,13 +35,13 @@ contract WizardArena {
 
   mapping(bytes32 => mapping(uint256 => bytes32)) public commitments;
 
-  mapping(bytes32 => mapping(uint256 => uint64[4])) public revelations;
+  mapping(bytes32 => mapping(uint256 => InputsOption)) public revelations;
 
   enum Status{ COMMIT, WAITING_FOR_COMMITS, REVEAL, WAITING_FOR_REVEAL, SETTLE }
 
   event Commit(address sender, uint256 tokenId);
 
-  event Reveal(address sender, uint256 tokenId, uint64[4] attacks);
+  event Reveal(address sender, uint256 tokenId, Inputs inputs);
 
   constructor(uint64 _gracePeriod, Wizards _wizards) {
     gracePeriod = _gracePeriod;
@@ -50,13 +54,9 @@ contract WizardArena {
     _;
   }
   
-  function commit(uint256 tokenId, ICommitVerifier.Proof memory proof, uint64[4] memory input) public tokenExists(tokenId) {
+  function commit(uint256 tokenId, bytes32 commitment) public tokenExists(tokenId) {
     require(queued.tokenId != tokenId, "commit: you are already queued");
     require(status(tokenId) == Status.COMMIT, "commit: status not ready");
-    // TODO: ugly
-    require(commitVerifier.verifyTx(proof, [uint(input[0]),uint(input[1]),uint(input[2]),uint(input[3])]), "commit: commit proof invalid");
-
-    bytes32 commitment = _inputToBytes32(input);
 
     if(queued.tokenId != 0) {
       queued = Queued(tokenId, commitment);
@@ -81,13 +81,13 @@ contract WizardArena {
     emit Commit(msg.sender, tokenId);
   }
 
-  function reveal(uint256 tokenId, uint64[4] memory attacks) public tokenExists(tokenId) {
+  function reveal(uint256 tokenId, Inputs memory inputs) public tokenExists(tokenId) {
     require(status(tokenId) == Status.REVEAL, "reveal: status not ready");
     bytes32 battleHash = tokenIdToBattle[tokenId];
-    require(commitments[battleHash][tokenId] == keccak256(abi.encodePacked(attacks)), "reveal: commitment hash does not match");
-    revelations[battleHash][tokenId] = attacks;
+    require(commitments[battleHash][tokenId] == keccak256(abi.encodePacked(inputs)), "reveal: commitment hash does not match");
+    revelations[battleHash][tokenId] = InputsOption(inputs, true);
 
-    emit Reveal(msg.sender, tokenId, attacks);
+    emit Reveal(msg.sender, tokenId, inputs);
   }
 
   function settle(uint256 tokenId) public tokenExists(tokenId) {
@@ -95,8 +95,7 @@ contract WizardArena {
     bytes32 battleHash = tokenIdToBattle[tokenId];
     
     uint256 score = _score(battleHash, tokenId);
-        
-    // TODO: settle winner
+    wizards.update(tokenId, score);
 
     _resetTokenId(tokenId);
   }
@@ -148,15 +147,23 @@ contract WizardArena {
   }
 
   function _score(bytes32 battleHash, uint256 tokenId) internal view returns (uint256) {
-    uint64[4] memory revelation = revelations[battleHash][tokenId];
-    uint64[4] memory opponentRevelation = revelations[battleHash][opponent(tokenId)];
-
+    Inputs memory revelation = revelations[battleHash][tokenId];
+    Inputs memory opponentRevelation = revelations[battleHash][opponent(tokenId)];
+  
+    if(!_hasRevelations(battleHash)) {
+      // players haven't both revealed yet so just early return
+      return 0;
+    }
+    
+    uint256[3] memory selection = _inputsToSelection(revelation.value);
+    uint256[3] memory opponentSelection = _inputsToSelection(opponentRevelation.value);
+    
     uint256 score = 0;
 
-    for(uint256 i = 0; i < 3; i++) {
-      if(revelation[i] == 1 && opponentRevelation[i] == 3
-        || revelation[i] == 2 && opponentRevelation[i] == 1
-        || revelation[i] == 3 && opponentRevelation[i] == 2) {
+    for(uint256 i = 0; i < 3) {
+      if(selection[i] == 0 && opponentSelection[i] == 2
+        || selection[i] == 1 && opponentSelection[i] == 0
+        || selection[i] == 2 && opponentSelection[i] == 1) {
         score++;
       }
     }
@@ -165,8 +172,8 @@ contract WizardArena {
   }
 
   function _hasRevealed(bytes32 battleHash, uint256 tokenId) internal view returns (bool) {
-    uint64[4] memory revelation = revelations[battleHash][tokenId];
-    return revelation[0] != 0 && revelation[1] != 0 && revelation[2] != 0;
+    InputsOption memory revelation = revelations[battleHash][tokenId];
+    return revelation.isSet;
   }
 
   function _hasRevelations(bytes32 battleHash) internal view returns (bool) {
@@ -179,14 +186,21 @@ contract WizardArena {
     }
     return has;
   }
-
-  function _inputToBytes32(uint64[4] memory input) internal pure returns (bytes32) {
-    bytes8 a = bytes8(uint64(input[0]));
-    bytes8 b = bytes8(uint64(input[1]));
-    bytes8 c = bytes8(uint64(input[2]));
-    bytes8 d = bytes8(uint64(input[3]));
-
-    return bytes32(abi.encodePacked(a,b,c,d));
+  
+  // Convert inputs into selections i.e
+  // inputs: uint[3][3] [[11, 22, 0], [33, 44, 0], [55, 55, 0]]
+  // selection: uint[3] [2, 2, 2]
+  function _inputsToSelection(Inputs memory inputs) internal pure returns (uint256[3]) {
+    uint256[3] selection = new uint256(3);
+    for(uint i = 0; i < 3; i++) {
+      if(inputs[i][0] == 0) {
+        selection[i] = 0;
+      } else if(inputs[i][1] == 0) {
+        selection[i] = 1;
+      } else if(inputs[i][2] == 0) {
+        selection[i] = 2;
+      }
+    }
   }
 
   function _resetQueued() internal {
