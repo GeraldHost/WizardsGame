@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 import "./lib/ArbSys.sol";
 import "./lib/AddressAliasHelper.sol";
 
-contract Wizards {
+contract Wizards is Ownable {
   ArbSys constant arbsys = ArbSys(address(100));
 
   struct Metadata {
@@ -24,21 +26,28 @@ contract Wizards {
 
   mapping(uint256 => Metadata) public tokenMetadatas;
 
-  constructor(address _l1Target, address _game) {
-    l1Target = _l1Target;
-    game = _game;
-  }
+  constructor() {}
 
   modifier onlyGame() {
     require(msg.sender == game);
     _;
   }
+  
+  modifier onlyOwnerOf(uint256 tokenId) {
+    require(msg.sender == ownerOf(tokenId), "not owner");
+    _;
+  }
 
-  function setL1Target(address _l1Target) public {
+  function init(address _l1Target, address _game) external onlyOwner {
+    l1Target = _l1Target;
+    game = _game;
+  }
+
+  function setL1Target(address _l1Target) public onlyOwner {
     l1Target = _l1Target;
   }
 
-  function setGame(address _game) public {
+  function setGame(address _game) public onlyOwner {
     game = _game;
   }
 
@@ -66,7 +75,7 @@ contract Wizards {
     return tokenMetadatas[tokenId].xp / 1000 + 1;
   }
 
-  function update(uint256 tokenId, uint256 score) public {
+  function update(uint256 tokenId, uint256 score) public onlyOwnerOf(tokenId) {
     uint256 level = xpLevelOf(tokenId);
     uint256 xp = (score / 3 + 1 / level) * 100;
     tokenMetadatas[tokenId].xp += xp;
