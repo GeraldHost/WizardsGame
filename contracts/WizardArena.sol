@@ -56,7 +56,7 @@ contract WizardArena {
     require(queued.tokenId != tokenId, "commit: you are already queued");
     require(status(tokenId) == Status.COMMIT, "commit: status not ready");
 
-    if(queued.tokenId != 0) {
+    if(queued.tokenId == 0) {
       queued = Queued(tokenId, commitment);
     } else {
       bytes32 battleHash = keccak256(abi.encodePacked(queued.tokenId, tokenId, block.number));
@@ -98,7 +98,7 @@ contract WizardArena {
     _resetTokenId(tokenId);
   }
 
-  function status(uint256 tokenId) public view tokenExists(tokenId) returns (Status) {
+  function status(uint256 tokenId) public view returns (Status) {
     bytes32 battleHash = tokenIdToBattle[tokenId];
 
     if(battleHash == 0) {
@@ -176,13 +176,12 @@ contract WizardArena {
 
   function _hasRevelations(bytes32 battleHash) internal view returns (bool) {
     Battle memory battle = battles[battleHash];
-    bool has = true;
-    for(uint256 i = 0; i < 2; i++) {
-      if(_hasRevealed(battleHash, battle.players[i])) {
-        has = false;
+    for(uint256 i = 0; i < battle.players.length; i++) {
+      if(!_hasRevealed(battleHash, battle.players[i])) {
+        return false;
       }
     }
-    return has;
+    return true;
   }
   
   // Convert inputs into selections i.e

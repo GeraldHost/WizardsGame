@@ -65,7 +65,7 @@ contract Wizards is Ownable {
     tokenOwners[tokenId] = owner;
   }
 
-  function upgrade(uint256 tokenId) public onlyGame {
+  function upgrade(uint256 tokenId) public onlyOwnerOf(tokenId) {
     require(tokenMetadatas[tokenId].xp >= 1000, "upgrade: not enough xp");
     tokenMetadatas[tokenId].level++;
     tokenMetadatas[tokenId].xp = 0;
@@ -75,7 +75,7 @@ contract Wizards is Ownable {
     return tokenMetadatas[tokenId].xp / 1000 + 1;
   }
 
-  function update(uint256 tokenId, uint256 score) public onlyOwnerOf(tokenId) {
+  function update(uint256 tokenId, uint256 score) public onlyGame {
     uint256 level = xpLevelOf(tokenId);
     uint256 xp = (score / 3 + 1 / level) * 100;
     tokenMetadatas[tokenId].xp += xp;
